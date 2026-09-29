@@ -1,7 +1,7 @@
 # Buildinglinks CLI
 
 `bl` draait de Buildinglinks-dataspace als complete simulatie op je eigen machine. Je krijgt een
-Trust Authority en acht deelnemers, elk met een eigen connector, data plane, Keycloak en
+Trust Authority en zes deelnemers, elk met een eigen connector, data plane, inlogomgeving (Keycloak-realm) en
 waar dat past een gesimuleerd gebouwbeheersysteem of een gesimuleerde applicatie. De
 deelnemers melden zich aan, publiceren gebouwdata, sluiten overeenkomsten en wisselen data
 uit, zoals dat in de echte dataspace gaat. Je kunt in elke connector inloggen en zelf verder
@@ -14,7 +14,7 @@ Dataspace-standaarden: Dataspace Protocol (DSP) 2025-1, Decentralized Claims Pro
 ## Wat je nodig hebt
 
 * Docker met compose: Docker Desktop op macOS en Windows, Docker Engine op Linux.
-* Ongeveer 6 GB vrij geheugen voor de simulatie. Geef Docker Desktop minstens 8 GB
+* Ongeveer 2 GB vrij geheugen voor de simulatie. Geef Docker Desktop minstens 4 GB
   (*Settings* → *Resources*).
 * Ongeveer 3 GB schijfruimte voor de images.
 * Poort 80 vrij op je machine (of kies een andere poort, zie [Problemen](#problemen)).
@@ -83,31 +83,29 @@ tegelijk ingelogd zijn.
 | Deelnemer | Rol | Connector |
 |---|---|---|
 | Buildinglinks Trust Authority | aanmelding, register, monitoring, notaris | http://authority.localhost |
-| Envitron | levert data van twee gebouwen (BMS) | http://envitron.localhost |
+| Sensortrust | levert data van twee gebouwen (BMS) | http://sensortrust.localhost |
 | Gebouwbeheer Noord | levert data van één gebouw (BMS) | http://noord.localhost |
-| AIMZ | klimaatoptimalisatie, schrijft setpoints | http://aimz.localhost |
-| FlexPower Energie | energieflexibiliteit, stuurt groepscommando's | http://flexpower.localhost |
+| Optimaforma | klimaatoptimalisatie, schrijft setpoints | http://optimaforma.localhost |
 | Facilitair Inzicht | comfortmonitoring, alleen lezen | http://facilitair.localhost |
-| GreenReport ESG | energierapportage, alleen lezen | http://greenreport.localhost |
-| TNO | eigenaar van een gebouw waarvan Envitron het BMS beheert; Envitron levert namens TNO | http://tno.localhost |
+| RealEstator | eigenaar van een gebouw waarvan Sensortrust het BMS beheert; Sensortrust levert namens RealEstator | http://realestator.localhost |
 | Nieuwe connector | vers geïnstalleerd, nog niet aangemeld | http://nieuwkomer.localhost |
 
 De gesimuleerde systemen achter de deelnemers hebben een eigen dashboard op
-`http://<deelnemer>-backend.localhost`, bijvoorbeeld http://aimz-backend.localhost. Verder zijn
+`http://<deelnemer>-backend.localhost`, bijvoorbeeld http://optimaforma-backend.localhost. Verder zijn
 er Mailpit voor de e-mail van de Trust Authority (http://mail.localhost), een gesimuleerde
 vertrouwensdienst voor elektronisch ondertekenen (http://qtsp.localhost) en de Digital
 Signature Service van de Europese Commissie (http://dss.localhost/validation).
 
 ## Wat je kunt proberen
 
-* **Kijk mee met de applicaties.** Het dashboard van AIMZ (http://aimz-backend.localhost) leest
-  via de dataspace meetwaarden uit de gebouwen van Envitron en stuurt setpoints terug. Het
-  BMS-dashboard van Envitron (http://envitron-backend.localhost) toont wat er binnenkomt.
-* **Verbind zelf een dataset.** Log in bij GreenReport → *Dataspace verkennen* → Envitron →
+* **Kijk mee met de applicaties.** Het dashboard van Optimaforma (http://optimaforma-backend.localhost) leest
+  via de dataspace meetwaarden uit de gebouwen van Sensortrust en stuurt setpoints terug. Het
+  BMS-dashboard van Sensortrust (http://sensortrust-backend.localhost) toont wat er binnenkomt.
+* **Verbind zelf een dataset.** Log in bij Facilitair Inzicht → *Dataspace verkennen* → Sensortrust →
   *Kantoor Weena Rotterdam* → *Verbinden*, met het aanbod "Alle leden mogen lezen". Binnen
-  enkele seconden is de verbinding actief en gebruikt de GreenReport-app de nieuwe bron.
+  enkele seconden is de verbinding actief en gebruikt de app van Facilitair de nieuwe bron.
 * **Zie het beleid werken.** Probeer vanuit Facilitair Inzicht het aanbod "Klimaatregeling" te
-  nemen. Envitron weigert: dat aanbod is alleen voor klimaatoptimalisatoren. De reden staat bij
+  nemen. Sensortrust weigert: dat aanbod is alleen voor klimaatoptimalisatoren. De reden staat bij
   de onderhandeling.
 * **Bekijk het bewijs.** Elke connector legt onder *Bewijsvoering* elke stap vast, met
   handtekeningen van beide partijen. Download een bewijspakket en controleer het zelf:
@@ -117,8 +115,8 @@ Signature Service van de Europese Commissie (http://dss.localhost/validation).
   vertrouwensdienst en keur de aanvraag goed in de Trust Authority onder *Onboarding*. Wat je
   nodig hebt om de Keycloak van de nieuwkomer te koppelen, toont `bl sim status`. Opnieuw
   beginnen: `bl sim reset --participant nieuwkomer`.
-* **Schors een deelnemer.** In de Trust Authority → *Deelnemers* → FlexPower → *Schorsen*.
-  Binnen een minuut stoppen de providers hun leveringen aan FlexPower.
+* **Schors een deelnemer.** In de Trust Authority → *Deelnemers* → Facilitair Inzicht →
+  *Schorsen*. Binnen een minuut stoppen de providers hun leveringen aan Facilitair.
 
 ## Commando's
 
@@ -130,14 +128,14 @@ Signature Service van de Europese Commissie (http://dss.localhost/validation).
 | `bl sim stop --purge` | stopt en wist alle data |
 | `bl sim reset` | alles wissen en opnieuw beginnen |
 | `bl sim reset --participant nieuwkomer` | alleen de nieuwe connector terug naar een verse installatie |
-| `bl sim logs [-f] [service …]` | logs, bijvoorbeeld `bl sim logs -f envitron-cp` |
+| `bl sim logs [-f] [service …]` | logs, bijvoorbeeld `bl sim logs -f sensortrust-cp` |
 | `bl evidence verify <pakket.json>` | een bewijspakket offline controleren |
 
 Opties van `bl sim start`:
 
 | Optie | Standaard | Betekenis |
 |---|---|---|
-| `--domain` | `localhost` | domein voor alle adressen: `envitron.<domein>`, `authority.<domein>`, … |
+| `--domain` | `localhost` | domein voor alle adressen: `sensortrust.<domein>`, `authority.<domein>`, … |
 | `--port` | `80` | poort waarop alles bereikbaar is |
 | `--project` | `bl-sim` | naam van de simulatie; zo draai je er meerdere naast elkaar |
 | `--tag` | de versie van `bl` | versie van de images |
@@ -171,15 +169,15 @@ Elke connector heeft een management-API op `http://<deelnemer>.localhost/api/v1/
 simulatie kun je die aanroepen met `Authorization: Bearer dev-admin-<deelnemer>`, bijvoorbeeld:
 
 ```bash
-curl -s -H "Authorization: Bearer dev-admin-aimz" http://aimz.localhost/api/v1/connections
+curl -s -H "Authorization: Bearer dev-admin-optimaforma" http://optimaforma.localhost/api/v1/connections
 ```
 
 ## Problemen
 
 **Poort 80 is bezet.** Start op een andere poort: `bl sim start --port 8080`. De adressen
-worden dan `http://envitron.localhost:8080` enzovoort.
+worden dan `http://sensortrust.localhost:8080` enzovoort.
 
-**`envitron.localhost` opent niet.** Chrome, Firefox en Edge sturen `*.localhost` zelf naar je
+**`sensortrust.localhost` opent niet.** Chrome, Firefox en Edge sturen `*.localhost` zelf naar je
 eigen machine; niet elke browser doet dat. Gebruik een van die browsers, of start met een naam
 die via DNS naar je machine wijst: `bl sim start --domain 127-0-0-1.sslip.io`.
 
