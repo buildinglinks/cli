@@ -139,6 +139,7 @@ Opties van `bl sim start`:
 | `--port` | `80` | poort waarop alles bereikbaar is |
 | `--project` | `bl-sim` | naam van de simulatie; zo draai je er meerdere naast elkaar |
 | `--tag` | de versie van `bl` | versie van de images |
+| `--password` | geen | één wachtwoord voor de hele simulatie (gebruiker `demo`) |
 
 `bl` onthoudt de opties van de vorige keer: een tweede `bl sim start` gebruikt hetzelfde
 domein en dezelfde poort. Alle opties staan in `bl --help` en `bl sim <commando> --help`.
@@ -156,8 +157,16 @@ bl sim start --domain 100-88-15-58.sslip.io
 De andere opent dan http://100-88-15-58.sslip.io, en jijzelf ook. Geef in Tailscale alleen poort
 80 van je machine vrij. Terug naar lokaal: `bl sim start --domain localhost`.
 
-De simulatie gebruikt vaste wachtwoorden (`admin`/`admin`). Zet haar daarom niet open op
-internet.
+De simulatie gebruikt vaste wachtwoorden (`admin`/`admin`). Zet haar daarom niet zonder
+eigen wachtwoord open op internet. Op een server met een eigen domein (DNS `demo.example.nl`
+en `*.demo.example.nl` naar de server, poort 80 en 443 open):
+
+```bash
+bl sim start --domain demo.example.nl --https --password 'lang-wachtwoord'
+```
+
+De browser vraagt één keer om gebruiker `demo` en het wachtwoord; daarna zijn alle adressen
+open.
 
 ## Scripts en AI-agents
 
@@ -189,6 +198,10 @@ verhoog het geheugen in Docker Desktop.
 een nieuwe release kunnen die er nog niet zijn; probeer het na een half uur opnieuw.
 
 **Opnieuw beginnen.** `bl sim reset` wist alles en richt de simulatie opnieuw in.
+
+**Verbindingen worden geweigerd na een update van `bl`.** Versies na 0.1.1 geven de simulatie
+een eigen dataspace (`buildinglinks-development`). Lidmaatschappen uit een simulatie van een
+oudere versie gelden daar niet. Begin opnieuw met `bl sim reset`.
 
 ## Verwijderen
 
