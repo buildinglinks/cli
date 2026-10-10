@@ -1,11 +1,13 @@
 # Buildinglinks CLI
 
 `bl` draait de Buildinglinks-dataspace als complete simulatie op je eigen machine. Je krijgt een
-Trust Authority en zes deelnemers, elk met een eigen connector, data plane, inlogomgeving (Keycloak-realm) en
-waar dat past een gesimuleerd gebouwbeheersysteem of een gesimuleerde applicatie. De
-deelnemers melden zich aan, publiceren gebouwdata, sluiten overeenkomsten en wisselen data
-uit, zoals dat in de echte dataspace gaat. Je kunt in elke connector inloggen en zelf verder
-spelen.
+Trust Authority en zeven organisaties, elk met een eigen connector, data plane, inlogomgeving
+(Keycloak-realm) en waar dat past een gesimuleerd gebouwbeheersysteem of een gesimuleerde app.
+De organisaties worden lid, bieden de data van negentien gebouwen aan, sluiten overeenkomsten
+en wisselen data uit, zoals dat in de echte dataspace gaat. Je kunt in elke connector inloggen
+en zelf verder spelen.
+
+Meer over de simulatie en wat je ermee kunt: https://docs.buildinglinks.nl/proberen/lokaal/.
 
 Buildinglinks is een dataspace voor kantoorgebouwen, gebouwd op de Eclipse
 Dataspace-standaarden: Dataspace Protocol (DSP) 2025-1, Decentralized Claims Protocol (DCP)
@@ -64,15 +66,16 @@ De eerste keer haalt Docker de images op; daarna start `bl` alles en richt het d
 simulatie in. Reken op vijf tot tien minuten. `bl` toont onderweg wat er gebeurt en sluit af
 met een overzicht van alle adressen.
 
-Open dan **http://localhost**. Je komt op de overzichtspagina van de Trust Authority, met
-links naar elke deelnemer.
+Open dan **http://localhost**. Op die startpagina kies je een rol (gebouweigenaar,
+beheerder van een gebouwbeheersysteem, app-bouwer, beheerder van de dataspace of nieuwkomer)
+en ga je met één klik naar de juiste plek. Bovenaan staat of alles werkt.
 
 Inloggen kan in elke connector met *Inloggen met SSO*:
 
 | Gebruiker | Wachtwoord | Mag |
 |---|---|---|
 | `admin` | `admin` | alles |
-| `operator` | `operator` | alles behalve de instellingen |
+| `operator` | `operator` | aanbieden, aanvragen, goedkeuren en het request-log instellen |
 | `viewer` | `viewer` | alleen kijken |
 
 Elke deelnemer heeft een eigen adres, dus je kunt in één browser bij meerdere deelnemers
@@ -80,15 +83,17 @@ tegelijk ingelogd zijn.
 
 ## Wie er meedoet
 
-| Deelnemer | Rol | Connector |
+| Organisatie | Rol | Connector |
 |---|---|---|
-| Buildinglinks Trust Authority | aanmelding, register, monitoring, notaris | http://authority.localhost |
-| Sensortrust | levert data van twee gebouwen (BMS) | http://sensortrust.localhost |
-| Gebouwbeheer Noord | levert data van één gebouw (BMS) | http://noord.localhost |
-| Optimaforma | klimaatoptimalisatie, schrijft setpoints | http://optimaforma.localhost |
-| Facilitair Inzicht | comfortmonitoring, alleen lezen | http://facilitair.localhost |
-| RealEstator | eigenaar van een gebouw waarvan Sensortrust het BMS beheert; Sensortrust levert namens RealEstator | http://realestator.localhost |
-| Nieuwe connector | vers geïnstalleerd, nog niet aangemeld | http://nieuwkomer.localhost |
+| Buildinglinks Trust Authority | beheert de dataspace: aanmelding, register, monitoring, notaris | http://authority.localhost |
+| RealEstator | rechthebbende van dertien panden, zonder eigen BMS | http://realestator.localhost |
+| Sensortrust | datahouder: het BMS van die dertien panden; levert namens RealEstator | http://sensortrust.localhost |
+| Gebouwbeheer Noord | rechthebbende en datahouder van zes eigen gebouwen; keurt sommige aanvragen met de hand goed | http://noord.localhost |
+| Installatiebedrijf Van de Ven | datahouder van de indeling van Delftechpark 26, uit een BIM-model, namens RealEstator | http://vandeven.localhost |
+| Optimaforma | dataontvanger: klimaatoptimalisatie, leest en stuurt setpoints | http://optimaforma.localhost |
+| Facilitair Inzicht | dataontvanger: comfortmonitoring, alleen lezen | http://facilitair.localhost |
+| Voltaflex | dataontvanger: energieflexibiliteit, stuurt batterijen | http://voltaflex.localhost |
+| Nieuwe connector | vers geïnstalleerd, nog geen lid | http://nieuwkomer.localhost |
 
 De gesimuleerde systemen achter de deelnemers hebben een eigen dashboard op
 `http://<deelnemer>-backend.localhost`, bijvoorbeeld http://optimaforma-backend.localhost. Verder zijn
@@ -96,40 +101,82 @@ er Mailpit voor de e-mail van de Trust Authority (http://mail.localhost), een ge
 vertrouwensdienst voor elektronisch ondertekenen (http://qtsp.localhost) en de Digital
 Signature Service van de Europese Commissie (http://dss.localhost/validation).
 
+De logopslag staat op **http://storage.localhost**. Log in met gebruiker en wachtwoord
+`admin`; op een afgeschermde demo is het wachtwoord hetzelfde als het demowachtwoord.
+Open de bucket `logs`: onder `runtime/<deelnemer>/<onderdeel>/<jaar>/<maand>/<dag>/` staan
+gzip-bestanden met één JSON-object per regel. Download een bestand en lees het bijvoorbeeld
+met `gzip -dc bestand.jsonl.gz | jq .`. Nieuwe bestanden verschijnen ongeveer elke 10 seconden.
+Voor live meekijken gebruik je `bl sim logs -f`.
+
+De datarequests van de data planes staan apart, onder `requests/<deelnemer>/dt=…/hour=…/level=…/`.
+Die hoef je niet zelf te downloaden:
+
+```bash
+bl sim requests --from 08:00 --to 12:00 --level warn
+```
+
+toont ze op tijd gesorteerd, met `--participant`, `--counterparty` en `--process` om te
+filteren en `--json` voor `jq`. Het vraagt ze aan de connectors, zoals `bl logs requests` na
+`bl login`; `--direct` leest de logopslag zelf.
+
+Onder **Instellingen → Request-log** kiezen operators en beheerders welke datarequests de
+data plane logt: `off`, `errors`, `warnings` of `all`. Buiten de simulatie is `warnings` de
+standaard; in de simulatie zet de seed hem op `all`, zodat je ook geslaagde requests ziet.
+Kies je zelf iets anders, dan laat de seed dat bij een volgende start staan. Je kunt daar ook de grens voor trage requests
+instellen. Een wijziging werkt binnen 10 seconden, zonder herstart.
+
+Logs blijven bij stoppen, starten en resetten bewaard. De bucket laat ze na zeven dagen
+verlopen; alleen `bl sim stop --purge` wist ook de logopslag. Vector buffert bij een
+opslagstoring maximaal 512 MiB op schijf. De Docker-logs roteren per container op drie
+bestanden van 10 MiB. Bij een langdurige storing kunnen daardoor logs verloren gaan.
+
 ## Wat je kunt proberen
 
-* **Kijk mee met de applicaties.** Het dashboard van Optimaforma (http://optimaforma-backend.localhost) leest
-  via de dataspace meetwaarden uit de gebouwen van Sensortrust en stuurt setpoints terug. Het
-  BMS-dashboard van Sensortrust (http://sensortrust-backend.localhost) toont wat er binnenkomt.
-* **Verbind zelf een dataset.** Log in bij Facilitair Inzicht → *Dataspace verkennen* → Sensortrust →
-  *Kantoor Weena Rotterdam* → *Verbinden*, met het aanbod "Alle leden mogen lezen". Binnen
-  enkele seconden is de verbinding actief en gebruikt de app van Facilitair de nieuwe bron.
-* **Zie het beleid werken.** Probeer vanuit Facilitair Inzicht het aanbod "Klimaatregeling" te
-  nemen. Sensortrust weigert: dat aanbod is alleen voor klimaatoptimalisatoren. De reden staat bij
-  de onderhandeling.
-* **Bekijk het bewijs.** Elke connector legt onder *Bewijsvoering* elke stap vast, met
-  handtekeningen van beide partijen. Download een bewijspakket en controleer het zelf:
-  `bl evidence verify bewijspakket.json`.
+De startpagina (http://localhost) heeft de hele looproute, met links naar de juiste schermen.
+Een paar stappen:
+
+* **Kijk mee met de apps.** Het dashboard van Optimaforma (http://optimaforma-backend.localhost)
+  leest via de dataspace de zones van zijn gebouwen en stuurt setpoints terug. Het dashboard van
+  het BMS van Sensortrust (http://sensortrust-backend.localhost) toont wat er binnenkomt.
+* **Vraag zelf data aan.** Log bij Facilitair Inzicht in als `operator` en open
+  http://facilitair.localhost/find/realestator/realestator-rtm-01 (*Data zoeken* → *Alle data ·
+  Weena 505, Rotterdam*). Kies *Alle leden van buildinglinks* en *Toegang aanvragen*. Binnen enkele
+  seconden heb je een abonnement, en binnen een minuut gebruikt de app van Facilitair het gebouw.
+* **Beslis wat openstaat.** Bij RealEstator → *Aanvragen* → *Te beoordelen* wachten een aanvraag van
+  Facilitair Inzicht voor verdieping 2 van Delftechpark 26 en een aanbod van Sensortrust om
+  Kennemerplein 8 in Haarlem te leveren. De simulatie handelt ze niet zelf af; na een afwijzing
+  staan ze bij de volgende start weer klaar.
+* **Zie het beleid werken.** Vraag bij een ander gebouw het product aan onder de voorwaarde voor
+  klimaatoptimalisatoren. RealEstator weigert: Facilitair Inzicht heeft die rol niet. De reden
+  staat onder *Aanvragen* → *Afgehandeld*.
+* **Laat een datahouder leveren.** Bij RealEstator zie je onder *Gebouwen* per pand wie de data
+  levert: Sensortrust, na een aanwijzing door RealEstator.
+* **Bekijk het bewijs.** Elke connector legt onder *Protocol en bewijs* → *Bewijs* elke stap vast,
+  met handtekeningen van beide partijen. Download een bewijspakket en controleer het zelf:
+  `bl evidence verify bewijspakket.json --online` (haalt de did:webvh van de authority op).
 * **Meld een nieuwe deelnemer aan.** Open http://nieuwkomer.localhost en log in met setup-code
   `SETUP-NIEUWKOMER`. Vul de aanmelding in, onderteken de e-mail in Mailpit bij de gesimuleerde
   vertrouwensdienst en keur de aanvraag goed in de Trust Authority onder *Onboarding*. Wat je
   nodig hebt om de Keycloak van de nieuwkomer te koppelen, toont `bl sim status`. Opnieuw
   beginnen: `bl sim reset --participant nieuwkomer`.
 * **Schors een deelnemer.** In de Trust Authority → *Deelnemers* → Facilitair Inzicht →
-  *Schorsen*. Binnen een minuut stoppen de providers hun leveringen aan Facilitair.
+  *Schorsen*. Binnen een minuut stoppen de leveringen aan Facilitair Inzicht.
 
 ## Commando's
 
 | Commando | Wat het doet |
 |---|---|
 | `bl sim start` | start de simulatie en richt haar in |
-| `bl sim status` | wat er draait, de adressen en de inloggegevens |
+| `bl sim status` | wat er draait en gezond is, de adressen en de inloggegevens |
 | `bl sim stop` | stopt; de data blijft bewaard en `start` gaat verder waar je was |
-| `bl sim stop --purge` | stopt en wist alle data |
-| `bl sim reset` | alles wissen en opnieuw beginnen |
+| `bl sim stop --purge` | stopt en wist alle data, inclusief logs |
+| `bl sim reset` | deelnemersdata wissen en opnieuw beginnen; logs blijven |
 | `bl sim reset --participant nieuwkomer` | alleen de nieuwe connector terug naar een verse installatie |
 | `bl sim logs [-f] [service …]` | logs, bijvoorbeeld `bl sim logs -f sensortrust-cp` |
-| `bl evidence verify <pakket.json>` | een bewijspakket offline controleren |
+| `bl sim requests [--from] [--to] [--level]` | de datarequests uit de logopslag, bijvoorbeeld `--from 2h --level warn` |
+| `bl logs runtime --direct` | de eigen logs van de diensten uit de logopslag, als een connector niet draait |
+| `bl login <url>` / `bl whoami` / `bl logout` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
+| `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
 
 Opties van `bl sim start`:
 
@@ -139,7 +186,10 @@ Opties van `bl sim start`:
 | `--port` | `80` | poort waarop alles bereikbaar is |
 | `--project` | `bl-sim` | naam van de simulatie; zo draai je er meerdere naast elkaar |
 | `--tag` | de versie van `bl` | versie van de images |
+| `--https` | uit | HTTPS met certificaten van Let's Encrypt, voor een publiek domein |
 | `--password` | geen | één wachtwoord voor de hele simulatie (gebruiker `demo`) |
+| `--view-only` | uit | kijkdemo: alleen `viewer`/`viewer` is openbaar, `admin` en `operator` krijgen een gegenereerd wachtwoord (`bl sim status`) |
+| `--static-site` | geen | `HOST=MAP`: nog een statische site op een eigen hostnaam, uit `MAP/current`, zonder wachtwoord |
 
 `bl` onthoudt de opties van de vorige keer: een tweede `bl sim start` gebruikt hetzelfde
 domein en dezelfde poort. Alle opties staan in `bl --help` en `bl sim <commando> --help`.
@@ -166,7 +216,18 @@ bl sim start --domain demo.example.nl --https --password 'lang-wachtwoord'
 ```
 
 De browser vraagt één keer om gebruiker `demo` en het wachtwoord; daarna zijn alle adressen
-open.
+open. Met `--password` op `localhost` vraagt de browser het wachtwoord per adres.
+
+Wil je dat iedereen mag rondkijken zonder iets te kunnen veranderen, start dan een kijkdemo:
+
+```bash
+bl sim start --domain demo.example.nl --https --view-only
+```
+
+Alleen `viewer`/`viewer` is dan openbaar. `admin` en `operator` krijgen een sterk wachtwoord,
+dat `bl sim status` toont. De nieuwe connector, Mailpit, de vertrouwensdienst, DSS, de
+logopslag en de beheerconsoles van Keycloak zijn niet bereikbaar, of alleen achter `--password`
+als je dat erbij zet.
 
 ## Scripts en AI-agents
 
@@ -175,7 +236,8 @@ JSON: de adressen per deelnemer, de inloggegevens en `seed` (`not_started`, `run
 of `failed`). Exitcode 0 is gelukt, 1 een fout, 2 een ongeldige aanroep.
 
 Elke connector heeft een management-API op `http://<deelnemer>.localhost/api/v1/...`. In de
-simulatie kun je die aanroepen met `Authorization: Bearer dev-admin-<deelnemer>`, bijvoorbeeld:
+simulatie kun je die aanroepen met `Authorization: Bearer dev-admin-<deelnemer>` (op een
+kijkdemo staan de tokens in `bl sim status --json`), bijvoorbeeld:
 
 ```bash
 curl -s -H "Authorization: Bearer dev-admin-optimaforma" http://optimaforma.localhost/api/v1/connections
@@ -190,9 +252,20 @@ worden dan `http://sensortrust.localhost:8080` enzovoort.
 eigen machine; niet elke browser doet dat. Gebruik een van die browsers, of start met een naam
 die via DNS naar je machine wijst: `bl sim start --domain 127-0-0-1.sslip.io`.
 
+**Werkt alles?** Bovenaan de startpagina (http://localhost) staat de status van elk onderdeel,
+elke 15 seconden bijgewerkt: antwoordt het, en doet het zijn werk (vertrouwt DSS de
+gesimuleerde vertrouwensdienst, zijn alle deelnemers aangemeld). `bl sim status` noemt de
+services die volgens Docker niet gezond zijn.
+
 **De start duurt lang of loopt vast.** Kijk wat de inrichting doet met `bl sim logs -f seed`.
 Heeft Docker te weinig geheugen, dan stoppen containers onverwacht; zie `bl sim status` en
-verhoog het geheugen in Docker Desktop.
+verhoog het geheugen in Docker Desktop. Mislukt de start, dan toont `bl` van elke service die
+niet opkwam de laatste healthcheck en logregels.
+
+**De images passen niet bij `bl`.** `bl` schrijft de configuratie, de images voeren haar uit.
+Komen ze uit verschillende commits, dan kan een service wachten op iets wat zijn image nog
+niet kan. `bl sim start` waarschuwt daarvoor. Bouw de images opnieuw (`bl sim start --build`,
+in de repository), of kies de passende `--tag`.
 
 **Images niet gevonden.** Elke versie van `bl` start de images van dezelfde versie. Kort na
 een nieuwe release kunnen die er nog niet zijn; probeer het na een half uur opnieuw.
