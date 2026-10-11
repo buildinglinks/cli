@@ -190,9 +190,42 @@ Opties van `bl sim start`:
 | `--password` | geen | één wachtwoord voor de hele simulatie (gebruiker `demo`) |
 | `--view-only` | uit | kijkdemo: alleen `viewer`/`viewer` is openbaar, `admin` en `operator` krijgen een gegenereerd wachtwoord (`bl sim status`) |
 | `--static-site` | geen | `HOST=MAP`: nog een statische site op een eigen hostnaam, uit `MAP/current`, zonder wachtwoord |
+| `--cast` | geen | een bezetting: andere namen en gebouwen, zie hieronder; `""` zet de gewone terug |
 
 `bl` onthoudt de opties van de vorige keer: een tweede `bl sim start` gebruikt hetzelfde
 domein en dezelfde poort. Alle opties staan in `bl --help` en `bl sim <commando> --help`.
+
+### Een andere bezetting
+
+Met `--cast bezetting.json` spelen andere organisaties de vier hoofdrollen, en staan andere
+gebouwen bij de rechthebbende. Het verhaal blijft hetzelfde; namen, adressen, realms en
+dataset-id's volgen de bezetting. Zo vindt iemand zijn eigen organisatie en gebouwen terug:
+
+```json
+{
+  "parties": {
+    "optimaforma": {"name": "AIMZ", "signatory": "Piet-Jan de Vries"},
+    "realestator": {"name": "Vastgoedfonds Noorderlicht", "slug": "noorderlicht"}
+  },
+  "buildings": [
+    {"object": "nl.bag.pand.0344100000012848", "name": "Moreelsepark 3",
+     "address": {"street": "Moreelsepark", "number": "3", "postcode": "3511EP", "city": "Utrecht"},
+     "location": {"lat": 52.0886, "lon": 5.1156}, "functions": ["kantoorfunctie"]}
+  ],
+  "own": "optimaforma"
+}
+```
+
+- `parties`: per rol (`realestator`, `sensortrust`, `optimaforma`, `vandeven`) een naam, en
+  eventueel het adres (`slug`, anders uit de naam) en de ondertekenaar.
+- `buildings`: gebouwen van de rechthebbende, zoals PDOK ze beschrijft. Het eerste neemt de
+  plaats in van Weena 505, waar de looproute langs gaat, dan Gustav Mahlerplein 2,
+  Delftechpark 26, Promenade 154, Kennemerplein 8 en de rest.
+- `own`: de rol waarmee de startpagina opent.
+
+Een andere bezetting past niet bij wat al draait: begin daarna opnieuw met `bl sim reset`. Wie
+welke rol speelt, schrijft `bl sim` naar `roster.json` in de map van de simulatie; de smoketest
+(`deploy/smoke.sh`) leest het daar en werkt zo met elke bezetting.
 
 ## De simulatie aan iemand anders laten zien
 
@@ -269,6 +302,16 @@ in de repository), of kies de passende `--tag`.
 
 **Images niet gevonden.** Elke versie van `bl` start de images van dezelfde versie. Kort na
 een nieuwe release kunnen die er nog niet zijn; probeer het na een half uur opnieuw.
+
+**De eerste minuut na een herstart mislukken dataverzoeken.** `bl sim start` meldt "klaar" zodra
+de inrichting klaar is, maar de apps van de dataontvangers moeten hun verbindingen dan nog
+opnieuw opzetten. Dat duurt ongeveer een minuut.
+
+**Het sslip.io-adres opent niet.** Sommige routers blokkeren DNS-antwoorden met een privé-adres,
+zoals een Tailscale-IP. Gebruik dan een eigen domein met een wildcard-record naar dat adres.
+
+**De schijf loopt vol.** De database groeit met het verkeer: met `--traffic quiet` ongeveer
+1 GB per dag, `normal` 3 à 4 GB en `busy` 15 à 20 GB. `bl sim reset` begint weer leeg.
 
 **Opnieuw beginnen.** `bl sim reset` wist alles en richt de simulatie opnieuw in.
 
