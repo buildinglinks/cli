@@ -191,6 +191,8 @@ Opties van `bl sim start`:
 | `--view-only` | uit | kijkdemo: alleen `viewer`/`viewer` is openbaar, `admin` en `operator` krijgen een gegenereerd wachtwoord (`bl sim status`) |
 | `--static-site` | geen | `HOST=MAP`: nog een statische site op een eigen hostnaam, uit `MAP/current`, zonder wachtwoord |
 | `--cast` | geen | een bezetting: andere namen en gebouwen, zie hieronder; `""` zet de gewone terug |
+| `--onboarding` | `qualified` | `admin`: de Trust Authority keurt aanmeldingen goed zonder gekwalificeerde handtekening; de tekenbevoegde aanvaardt het rulebook in de connector |
+| `--ui` | `buildinglinks` | het profiel van de beheeromgeving van elke connector: `buildinglinks`, `standaard` (alleen de algemene schermen) of `flexlab` |
 
 `bl` onthoudt de opties van de vorige keer: een tweede `bl sim start` gebruikt hetzelfde
 domein en dezelfde poort. Alle opties staan in `bl --help` en `bl sim <commando> --help`.
@@ -230,14 +232,14 @@ welke rol speelt, schrijft `bl sim` naar `roster.json` in de map van de simulati
 ## De simulatie aan iemand anders laten zien
 
 Met [Tailscale](https://tailscale.com) kun je de simulatie op je machine delen met iemand in
-je tailnet. Zoek je Tailscale-adres op (`tailscale ip -4`, bijvoorbeeld `100.88.15.58`) en
+je tailnet. Zoek je Tailscale-adres op (`tailscale ip -4`, bijvoorbeeld `100.64.1.2`) en
 start met dat adres in een sslip.io-naam:
 
 ```bash
-bl sim start --domain 100-88-15-58.sslip.io
+bl sim start --domain 100-64-1-2.sslip.io
 ```
 
-De andere opent dan http://100-88-15-58.sslip.io, en jijzelf ook. Geef in Tailscale alleen poort
+De andere opent dan http://100-64-1-2.sslip.io, en jijzelf ook. Geef in Tailscale alleen poort
 80 van je machine vrij. Terug naar lokaal: `bl sim start --domain localhost`.
 
 De simulatie gebruikt vaste wachtwoorden (`admin`/`admin`). Zet haar daarom niet zonder
@@ -328,3 +330,11 @@ rm -rf ~/.local/share/bl            # de bestanden van de simulaties
 ```
 
 De images verwijder je met `docker image prune -a` of in Docker Desktop.
+
+## Licentie
+
+`bl` en de images zijn © TNO, alle rechten voorbehouden. Dat ze openbaar te downloaden zijn,
+geeft geen recht om ze te gebruiken, te kopiëren, te wijzigen of te verspreiden: daarvoor is
+schriftelijke toestemming van TNO nodig, bijvoorbeeld in een pilotovereenkomst. De voorwaarden
+staan in `LICENSE` in het archief van `bl` en in `/licenses/` in elk image, met de licenties van
+onderdelen van derden in `THIRD_PARTY_NOTICES`.
