@@ -177,6 +177,9 @@ Een paar stappen:
 | `bl logs runtime --direct` | de eigen logs van de diensten uit de logopslag, als een connector niet draait |
 | `bl login <url>` / `bl whoami` / `bl logout` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
 | `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
+| `bl connector init --target k8s\|compose …` | sleutels, geheimen en configuratie voor een eigen connector, zie [Een eigen connector](#een-eigen-connector) |
+| `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen |
+| `bl api <METHODE> <pad> [--data …]` | één aanroep van de beheer-API, met de sessie van `bl login` |
 
 Opties van `bl sim start`:
 
@@ -264,6 +267,66 @@ dat `bl sim status` toont. De nieuwe connector, Mailpit, de vertrouwensdienst, D
 logopslag en de beheerconsoles van Keycloak zijn niet bereikbaar, of alleen achter `--password`
 als je dat erbij zet.
 
+## Een eigen connector
+
+Met `bl connector init` installeer je een connector in Kubernetes (met de Helm-chart
+`connector`) of met Docker Compose. Hij stelt geen vragen, zodat ook een AI-agent hem kan
+draaien:
+
+```bash
+bl connector init --target k8s \
+  --environment acceptance \
+  --control-plane-host connector.example.nl \
+  --data-plane-host data.connector.example.nl \
+  --authority-did did:web:authority.acc.buildinglinks.nl \
+  --dataspace buildinglinks-pilot \
+  --bundled-db \
+  --namespace buildinglinks --ingress-class traefik \
+  --out ./connector
+```
+
+| Optie | Betekenis |
+|---|---|
+| `--target` | `k8s` (Helm) of `compose` |
+| `--environment` | `production`, `acceptance` of `development` |
+| `--control-plane-host`, `--data-plane-host` | de twee publieke hosts; de DID volgt uit de eerste. Ook een volledig adres mag; `http://` alleen in `development` |
+| `--authority-did` | de DID van de Trust Authority; haar adres volgt eruit |
+| `--dataspace` | `BL_DATASPACE`, de dataspace zoals de Trust Authority hem noemt; standaard `buildinglinks` |
+| `--database-url` en `--redis-url`, of `--bundled-db` | een eigen Postgres en Redis, of die van de chart of compose (voor staging en tests) |
+| `--out` | de map voor sleutels en configuratie |
+| `--namespace`, `--release`, `--ingress-class` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`) en `ingress.className` |
+| `--force` | maak alle sleutels opnieuw; een draaiende connector verliest dan zijn DID |
+
+In `--out` komen:
+
+- `geheimen/connector/`: `identity.jwk`, `dataplane.pub.jwk`, `did-update.jwk`,
+  `did-update-next.jwk`, `data.key`, `session.key` en `did-next-key.hash`, de sleutelmap van de
+  control plane;
+- `geheimen/dataplane/`: `dataplane.jwk` en dezelfde `data.key`;
+- `geheimen/database/`: de wachtwoorden van Postgres en Redis, met `--bundled-db`;
+- `offline/did-update-after.jwk`: de update-sleutel na de volgende. **Bewaar hem offline, niet
+  op de server**; alleen zijn hash staat in `did-next-key.hash`;
+- bij `k8s`: `secrets.yaml` (de Secrets `connector-keys`, `dataplane-keys` en `connector-env`)
+  en `values.yaml` met de minimale configuratie;
+- bij `compose`: `compose.yaml`, `Caddyfile` en `.env`. In `.env` staan ook `BL_UID` en
+  `BL_GID`, de eigenaar van `geheimen/`: connector en data plane draaien als die gebruiker en
+  lezen de sleutels zonder `chown`.
+
+Bestaande sleutels laat hij staan; de configuratie schrijft hij elke keer opnieuw. De uitvoer
+noemt elk bestand, de id van de datasleutel en de volgende stappen, zoals
+`kubectl apply -f connector/secrets.yaml` en
+`helm install connector oci://ghcr.io/buildinglinks/charts/connector --version <versie van bl> -f connector/values.yaml`.
+
+Daarna controleert `bl connector check https://connector.example.nl` de installatie: DNS en TLS
+van beide hosts, de DID-documenten (de DID moet bij de host horen), DSP, de publieke data plane,
+dat `/api/v1` en `/gateway` niet publiek zijn, de Trust Authority (met `--authority-did`) en
+`/healthz`. Met `--dataspace` en `--environment` controleert hij ook dat de Trust Authority
+lidmaatschap geeft van de dataspace die de connector eist: de naam, en buiten `production` met
+de omgeving erachter (`buildinglinks-pilot-acceptance`). Ben je ingelogd met `bl login`, dan ook de effectieve configuratie, het lidmaatschap
+en de koppeling met je identity provider. Draai je de controle van buiten je netwerk, geef dan
+`--extern`: een bereikbare `/api/v1` of `/gateway` is dan een fout in plaats van een
+waarschuwing.
+
 ## Scripts en AI-agents
 
 `bl` stelt nooit vragen; alles gaat via opties. `bl sim status --json` geeft de toestand als
@@ -277,6 +340,33 @@ kijkdemo staan de tokens in `bl sim status --json`), bijvoorbeeld:
 ```bash
 curl -s -H "Authorization: Bearer dev-admin-optimaforma" http://optimaforma.localhost/api/v1/connections
 ```
+
+Bij een echte connector log je eerst in met `bl login <url>`; daarna doet `bl api` elke
+aanroep van de beheer-API met die sessie:
+
+```bash
+bl api GET /api/v1/self
+bl api POST /api/v1/sources --data @systeem.json
+bl api PUT /api/v1/settings/idp --data - < idp.json
+```
+
+`bl connector` en `bl api` volgen de afspraken voor agents: buiten een terminal is de uitvoer
+JSON, en een fout staat als JSON op stderr (`code`, `message`, `hint`). De exitcodes:
+
+| Exitcode | Betekenis |
+|---|---|
+| 0 | gelukt |
+| 1 | overig |
+| 2 | ongeldige aanroep |
+| 3 | niet ingelogd of sessie verlopen |
+| 4 | niet gevonden |
+| 5 | conflict |
+| 6 | geen rechten |
+| 7 | connector onbereikbaar |
+| 8 | een controle van `bl connector check` mislukt |
+
+Zet `BL_AGENT=<naam>` (bijvoorbeeld `claude-code`), dan stuurt `bl` die naam mee in de kop
+`BL-Agent`, zodat de audit-log een agent onderscheidt van een mens met hetzelfde profiel.
 
 ## Problemen
 
