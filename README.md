@@ -178,7 +178,8 @@ Een paar stappen:
 | `bl login <url>` / `bl whoami` / `bl logout` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
 | `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
 | `bl connector init --target k8s\|compose …` | sleutels, geheimen en configuratie voor een eigen connector, zie [Een eigen connector](#een-eigen-connector) |
-| `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen |
+| `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen; elke mislukte controle noemt de volgende stap |
+| `bl connector join <url> --org … --kvk … --role … --contact …` | je organisatie aanmelden bij de Trust Authority en wachten tot het lidmaatschap actief is |
 | `bl api <METHODE> <pad> [--data …]` | één aanroep van de beheer-API, met de sessie van `bl login` |
 
 Opties van `bl sim start`:
@@ -275,11 +276,10 @@ draaien:
 
 ```bash
 bl connector init --target k8s \
-  --environment acceptance \
+  --authority https://authority.acc.buildinglinks.nl \
   --control-plane-host connector.example.nl \
   --data-plane-host data.connector.example.nl \
-  --authority-did did:web:authority.acc.buildinglinks.nl \
-  --dataspace buildinglinks-pilot \
+  --oidc-issuer https://keycloak.example.nl/realms/organisatie \
   --bundled-db \
   --namespace buildinglinks --ingress-class traefik \
   --out ./connector
@@ -288,10 +288,12 @@ bl connector init --target k8s \
 | Optie | Betekenis |
 |---|---|
 | `--target` | `k8s` (Helm) of `compose` |
-| `--environment` | `production`, `acceptance` of `development` |
+| `--authority` | het adres van de Trust Authority: haar DID, de dataspace en de omgeving komen daarvandaan (`/api/v1/self`) |
+| `--environment` | `production`, `acceptance` of `development`; met `--authority` standaard die van de Trust Authority |
 | `--control-plane-host`, `--data-plane-host` | de twee publieke hosts; de DID volgt uit de eerste. Ook een volledig adres mag; `http://` alleen in `development` |
-| `--authority-did` | de DID van de Trust Authority; haar adres volgt eruit |
-| `--dataspace` | `BL_DATASPACE`, de dataspace zoals de Trust Authority hem noemt; standaard `buildinglinks` |
+| `--authority-did` | de DID van de Trust Authority, als je `--authority` niet geeft; haar adres volgt eruit |
+| `--dataspace` | `BL_DATASPACE`, de dataspace zoals de Trust Authority hem noemt; met `--authority` komt hij daarvandaan, anders standaard `buildinglinks` |
+| `--oidc-issuer` | de issuer-URL van je identity provider: `BL_OIDC_ISSUER` in de configuratie, en `keycloak-client.json` om in Keycloak te importeren. Dan heeft niemand de setup-code nodig. Met `--oidc-client-id` (standaard `connector`), `--oidc-client-secret` (standaard maakt `bl` er een) en `--oidc-internal-url` |
 | `--database-url` en `--redis-url`, of `--bundled-db` | een eigen Postgres en Redis, of die van de chart of compose (voor staging en tests) |
 | `--out` | de map voor sleutels en configuratie |
 | `--namespace`, `--release`, `--ingress-class` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`) en `ingress.className` |
@@ -310,12 +312,16 @@ In `--out` komen:
   en `values.yaml` met de minimale configuratie;
 - bij `compose`: `compose.yaml`, `Caddyfile` en `.env`. In `.env` staan ook `BL_UID` en
   `BL_GID`, de eigenaar van `geheimen/`: connector en data plane draaien als die gebruiker en
-  lezen de sleutels zonder `chown`.
+  lezen de sleutels zonder `chown`;
+- met `--oidc-issuer`: `geheimen/connector/oidc-client.secret` en `keycloak-client.json`, de
+  client voor Keycloak (*Clients*, *Import client*) met de redirect-URI's van de connector en dat
+  secret. De identity provider staat dan in `values.yaml` (`oidc`) en `secrets.yaml`, of in `.env`.
 
 Bestaande sleutels laat hij staan; de configuratie schrijft hij elke keer opnieuw. De uitvoer
 noemt elk bestand, de id van de datasleutel en de volgende stappen, zoals
-`kubectl apply -f connector/secrets.yaml` en
-`helm install connector oci://ghcr.io/buildinglinks/charts/connector --version <versie van bl> -f connector/values.yaml`.
+`kubectl apply -f connector/secrets.yaml`,
+`helm install connector oci://ghcr.io/buildinglinks/charts/connector --version <versie van bl> -f connector/values.yaml`,
+de eerste login en `bl connector join`.
 
 Daarna controleert `bl connector check https://connector.example.nl` de installatie: DNS en TLS
 van beide hosts, de DID-documenten (de DID moet bij de host horen), DSP, de publieke data plane,
@@ -323,9 +329,28 @@ dat `/api/v1` en `/gateway` niet publiek zijn, de Trust Authority (met `--author
 `/healthz`. Met `--dataspace` en `--environment` controleert hij ook dat de Trust Authority
 lidmaatschap geeft van de dataspace die de connector eist: de naam, en buiten `production` met
 de omgeving erachter (`buildinglinks-pilot-acceptance`). Ben je ingelogd met `bl login`, dan ook de effectieve configuratie, het lidmaatschap
-en de koppeling met je identity provider. Draai je de controle van buiten je netwerk, geef dan
-`--extern`: een bereikbare `/api/v1` of `/gateway` is dan een fout in plaats van een
-waarschuwing.
+en de koppeling met je identity provider. Elke controle die niet in orde is, noemt de volgende
+stap (een commando waar dat kan), en het rapport eindigt met de eerste. Draai je de controle van
+buiten je netwerk, geef dan `--extern`: een bereikbare `/api/v1` of `/gateway` is dan een fout in
+plaats van een waarschuwing.
+
+Lid worden doe je met `bl connector join`, na `bl login`:
+
+```bash
+bl connector join https://connector.example.nl \
+  --org "Voorbeeld B.V." --kvk 12345678 \
+  --role bms_provider \
+  --contact "Naam <naam@example.nl>" \
+  --accept-rulebook
+```
+
+Het stuurt de aanmelding naar de Trust Authority (zoals de wizard onder *Aanmelden*) en wacht
+tot haar beheerder heeft goedgekeurd en het lidmaatschapsbewijs binnen is (standaard tien
+minuten, `--wait`). `--contact` is de contactpersoon en de tekenbevoegde, als `"Naam <e-mail>"`
+(een andere tekenbevoegde: `--signatory`); `--accept-rulebook` is diens aanvaarding van het
+rulebook dat bij de Trust Authority geldt, nodig als zij toelaat zonder handtekening. `--role`
+mag vaker; de rollen staan op `/api/v1/onboarding/roles` van de Trust Authority. Nog eens
+aanroepen, ook zonder gegevens, wacht verder; is de connector al lid, dan zegt het dat.
 
 ## Scripts en AI-agents
 
@@ -345,6 +370,7 @@ Bij een echte connector log je eerst in met `bl login <url>`; daarna doet `bl ap
 aanroep van de beheer-API met die sessie:
 
 ```bash
+bl connector join https://connector.example.nl --org "Voorbeeld B.V." --kvk 12345678 --role bms_provider --contact "Naam <naam@example.nl>" --accept-rulebook
 bl api GET /api/v1/self
 bl api POST /api/v1/sources --data @systeem.json
 bl api PUT /api/v1/settings/idp --data - < idp.json
@@ -361,7 +387,7 @@ JSON, en een fout staat als JSON op stderr (`code`, `message`, `hint`). De exitc
 | 3 | niet ingelogd of sessie verlopen |
 | 4 | niet gevonden |
 | 5 | conflict |
-| 6 | geen rechten |
+| 6 | geen rechten, of de Trust Authority wees de aanmelding af |
 | 7 | connector onbereikbaar |
 | 8 | een controle van `bl connector check` mislukt |
 
