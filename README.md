@@ -195,7 +195,7 @@ Opties van `bl sim start`:
 | `--view-only` | uit | kijkdemo: alleen `viewer`/`viewer` is openbaar, `admin` en `operator` krijgen een gegenereerd wachtwoord (`bl sim status`) |
 | `--static-site` | geen | `HOST=MAP`: nog een statische site op een eigen hostnaam, uit `MAP/current`, zonder wachtwoord |
 | `--cast` | geen | een bezetting: andere namen en gebouwen, zie hieronder; `""` zet de gewone terug |
-| `--onboarding` | `qualified` | `admin`: de Trust Authority keurt aanmeldingen goed zonder gekwalificeerde handtekening; de tekenbevoegde aanvaardt het rulebook in de connector |
+| `--onboarding` | `qualified` | `email`: de tekenbevoegde bevestigt rulebook en mandaat via een link per mail (in Mailpit), een beheerder keurt goed; `admin`: de Trust Authority keurt aanmeldingen goed zonder handtekening, de tekenbevoegde aanvaardt het rulebook in de connector |
 | `--ui` | `buildinglinks` | het profiel van de beheeromgeving van elke connector: `buildinglinks`, `standaard` (alleen de algemene schermen) of `flexlab` |
 
 `bl` onthoudt de opties van de vorige keer: een tweede `bl sim start` gebruikt hetzelfde
@@ -347,8 +347,9 @@ bl connector join https://connector.example.nl \
 Het stuurt de aanmelding naar de Trust Authority (zoals de wizard onder *Aanmelden*) en wacht
 tot haar beheerder heeft goedgekeurd en het lidmaatschapsbewijs binnen is (standaard tien
 minuten, `--wait`). `--contact` is de contactpersoon en de tekenbevoegde, als `"Naam <e-mail>"`
-(een andere tekenbevoegde: `--signatory`); `--accept-rulebook` is diens aanvaarding van het
-rulebook dat bij de Trust Authority geldt, nodig als zij toelaat zonder handtekening. `--role`
+(een andere tekenbevoegde: `--signatory "Naam <e-mail>"`). Meestal mailt de Trust Authority de
+tekenbevoegde, die de documenten achter de link bevestigt of ondertekent. Laat zij toe zonder mail
+(de stand `admin`), dan is `--accept-rulebook` de aanvaarding van het rulebook door de tekenbevoegde. `--role`
 mag vaker; de rollen staan op `/api/v1/onboarding/roles` van de Trust Authority. Nog eens
 aanroepen, ook zonder gegevens, wacht verder; is de connector al lid, dan zegt het dat.
 
