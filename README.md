@@ -15,14 +15,14 @@ Dataspace-standaarden: Dataspace Protocol (DSP) 2025-1, Decentralized Claims Pro
 
 ## Wat je nodig hebt
 
-* Docker met compose: Docker Desktop op macOS en Windows, Docker Engine op Linux.
+* Een x86_64-machine, met Docker en compose: Docker Desktop op Windows, Docker Engine op Linux.
 * Ongeveer 2 GB vrij geheugen voor de simulatie. Geef Docker Desktop minstens 4 GB
   (*Settings* → *Resources*).
 * Ongeveer 3 GB schijfruimte voor de images.
 * Poort 80 vrij op je machine (of kies een andere poort, zie [Problemen](#problemen)).
 
-Macs met Apple Silicon worden ondersteund: de images zijn er voor amd64 en arm64. Op Windows
-is `bl` nog niet getest.
+Op een Mac met Apple Silicon werkt `bl` wel, maar de simulatie niet: de images zijn er alleen voor
+amd64. Probeer dan https://demo.buildinglinks.nl. Op Windows is `bl` nog niet getest.
 
 ## Installeren
 
@@ -177,7 +177,8 @@ Een paar stappen:
 | `bl logs runtime --direct` | de eigen logs van de diensten uit de logopslag, als een connector niet draait |
 | `bl login <url>` / `bl whoami` / `bl logout` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
 | `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
-| `bl connector init --target k8s\|compose …` | sleutels, geheimen en configuratie voor een eigen connector, zie [Een eigen connector](#een-eigen-connector) |
+| `bl connector install --target k8s\|compose …` | een eigen connector in één keer installeren: sleutels en configuratie, de uitrol en de controles, zie [Een eigen connector](#een-eigen-connector) |
+| `bl connector init --target k8s\|compose …` | alleen de sleutels, geheimen en configuratie voor een eigen connector |
 | `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen; elke mislukte controle noemt de volgende stap |
 | `bl connector join <url> --org … --kvk … --role … --contact …` | je organisatie aanmelden bij de Trust Authority en wachten tot het lidmaatschap actief is |
 | `bl api <METHODE> <pad> [--data …]` | één aanroep van de beheer-API, met de sessie van `bl login` |
@@ -210,7 +211,7 @@ dataset-id's volgen de bezetting. Zo vindt iemand zijn eigen organisatie en gebo
 ```json
 {
   "parties": {
-    "optimaforma": {"name": "AIMZ", "signatory": "Piet-Jan de Vries"},
+    "optimaforma": {"name": "Voorbeeld B.V.", "signatory": "Anna de Vries"},
     "realestator": {"name": "Vastgoedfonds Noorderlicht", "slug": "noorderlicht"}
   },
   "buildings": [
@@ -270,13 +271,56 @@ als je dat erbij zet.
 
 ## Een eigen connector
 
-Met `bl connector init` installeer je een connector in Kubernetes (met de Helm-chart
-`connector`) of met Docker Compose. Hij stelt geen vragen, zodat ook een AI-agent hem kan
-draaien:
+Met `bl connector install` installeer je een connector in één keer, in Kubernetes (met de
+Helm-chart `connector`) of met Docker Compose. Het stelt geen vragen, zodat ook een AI-agent het
+kan draaien:
+
+```bash
+bl connector install --target k8s --context mijn-cluster \
+  --authority https://authority.example.nl \
+  --control-plane-host connector.example.nl \
+  --data-plane-host data.connector.example.nl \
+  --oidc-issuer https://keycloak.example.nl/realms/organisatie \
+  --bundled-db
+```
+
+De opties zijn die van `bl connector init` (hieronder), met `--out` standaard `connector` en
+`--namespace` standaard `buildinglinks`, en daarnaast:
+
+| Optie | Betekenis |
+|---|---|
+| `--context` | het cluster, de NAME uit `kubectl config get-contexts`. Verplicht bij `k8s`: `bl` gebruikt nooit stil de actieve context, en elke aanroep van `kubectl` en `helm` noemt hem. Niet bij `compose` |
+| `--dry-run` | toont wat er zou gebeuren en verandert niets, ook geen bestanden; leest wel uit het cluster |
+| `--timeout` | hoe lang, in seconden, op de uitrol wordt gewacht (standaard 600) |
+
+**Op Kubernetes** zoekt het de ingress-class (de standaard of de enige) en de ClusterIssuer (de
+enige) op in je cluster; bij meer dan één stopt het met exitcode 2 en de lijst, en kies je met
+`--ingress-class` of `--cluster-issuer`. Zonder ClusterIssuer gaat het door en meldt het dat je de
+Secrets `connector-tls` en `dataplane-tls` zelf zet; `--cluster-issuer ""` kiest daar expliciet
+voor. Bij Traefik komt de annotatie voor het entrypoint `websecure` in `values.yaml`. Daarna maakt
+het de namespace als die er nog niet is, doet `kubectl apply` van `secrets.yaml` en
+`helm upgrade --install` met de versie van deze `bl`, en wacht het op de uitrol.
+
+**Met Docker Compose** draait het op de server zelf. Het controleert of poort 80 en 443 vrij zijn,
+tenzij de Caddy van deze installatie ze al heeft (exitcode 5 als ze bezet zijn), en doet
+`docker compose up -d` met de profielen `tls`, `gebouwservice` (niet met `--no-building`) en
+`database` (met `--bundled-db`). Daarna wacht het tot de diensten gezond zijn.
+
+Het eindigt met de stand van `bl connector check`, de twee DNS-records met hun doel (het externe
+adres van de ingress-controller, of het adres van de server als dat betrouwbaar publiek is),
+of de namen al wijzen, en de volgende stap. Een controle die mislukt omdat DNS of het certificaat
+er nog niet is, is geen fout: dan is de exitcode 0. Een uitrol die mislukt of te lang duurt geeft
+exitcode 8, net als een andere mislukte controle terwijl de namen al goed wijzen.
+
+Opnieuw draaien is veilig: bestaande sleutels, `values.yaml` en `.env` blijven staan, en
+`values.yaml` bepaalt dan ook de ingress-class en de ClusterIssuer. Geheimen komen nooit in de
+uitvoer, ook niet als `kubectl`, `helm` of `docker` ze in een foutmelding herhalen.
+
+Wil je alleen de bestanden, gebruik dan `bl connector init`:
 
 ```bash
 bl connector init --target k8s \
-  --authority https://authority.acc.buildinglinks.nl \
+  --authority https://authority.example.nl \
   --control-plane-host connector.example.nl \
   --data-plane-host data.connector.example.nl \
   --oidc-issuer https://keycloak.example.nl/realms/organisatie \
@@ -293,11 +337,11 @@ bl connector init --target k8s \
 | `--control-plane-host`, `--data-plane-host` | de twee publieke hosts; de DID volgt uit de eerste. Ook een volledig adres mag; `http://` alleen in `development` |
 | `--authority-did` | de DID van de Trust Authority, als je `--authority` niet geeft; haar adres volgt eruit |
 | `--dataspace` | `BL_DATASPACE`, de dataspace zoals de Trust Authority hem noemt; met `--authority` komt hij daarvandaan, anders standaard `buildinglinks` |
-| `--oidc-issuer` | de issuer-URL van je identity provider: `BL_OIDC_ISSUER` in de configuratie, en `keycloak-client.json` om in Keycloak te importeren. Dan heeft niemand de setup-code nodig. Met `--oidc-client-id` (standaard `connector`), `--oidc-client-secret` (standaard maakt `bl` er een) en `--oidc-internal-url` |
-| `--database-url` en `--redis-url`, of `--bundled-db` | een eigen Postgres en Redis, of die van de chart of compose (voor staging en tests) |
+| `--oidc-issuer` | de issuer-URL van je identity provider: `BL_OIDC_ISSUER` in de configuratie, en `keycloak-client.json` om in Keycloak te importeren. Dan heeft niemand de setup-code nodig. Met `--oidc-client-id` (standaard `connector`), `--oidc-client-secret` (standaard maakt `bl` er een) en `--oidc-internal-url`. Microsoft Entra ID (`https://login.microsoftonline.com/<tenant>/v2.0`) herkent `bl` aan de host: `--oidc-client-id` en `--oidc-client-secret` zijn dan verplicht, er komt geen `keycloak-client.json`, en de configuratie krijgt de rollen-claim `roles` en `offline_access` |
+| `--database-url`, of `--bundled-db` | een eigen Postgres, of die van de chart of compose (voor staging en tests) |
 | `--out` | de map voor sleutels en configuratie |
-| `--namespace`, `--release`, `--ingress-class` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`) en `ingress.className` |
-| `--force` | maak alle sleutels opnieuw; een draaiende connector verliest dan zijn DID |
+| `--namespace`, `--release`, `--ingress-class`, `--cluster-issuer` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`), `ingress.className` en de ClusterIssuer van cert-manager (`ingress.certManager.clusterIssuer`) |
+| `--force` | schrijf alles opnieuw: nieuwe sleutels, en `values.yaml` en `.env` overschreven; een draaiende connector verliest dan zijn DID |
 
 In `--out` komen:
 
@@ -305,7 +349,7 @@ In `--out` komen:
   `did-update-next.jwk`, `data.key`, `session.key` en `did-next-key.hash`, de sleutelmap van de
   control plane;
 - `geheimen/dataplane/`: `dataplane.jwk` en dezelfde `data.key`;
-- `geheimen/database/`: de wachtwoorden van Postgres en Redis, met `--bundled-db`;
+- `geheimen/database/`: het wachtwoord van Postgres, met `--bundled-db`;
 - `offline/did-update-after.jwk`: de update-sleutel na de volgende. **Bewaar hem offline, niet
   op de server**; alleen zijn hash staat in `did-next-key.hash`;
 - bij `k8s`: `secrets.yaml` (de Secrets `connector-keys`, `dataplane-keys` en `connector-env`)
@@ -317,22 +361,24 @@ In `--out` komen:
   client voor Keycloak (*Clients*, *Import client*) met de redirect-URI's van de connector en dat
   secret. De identity provider staat dan in `values.yaml` (`oidc`) en `secrets.yaml`, of in `.env`.
 
-Bestaande sleutels laat hij staan; de configuratie schrijft hij elke keer opnieuw. De uitvoer
-noemt elk bestand, de id van de datasleutel en de volgende stappen, zoals
+Bestaande sleutels, `values.yaml` en `.env` laat hij staan, en hij meldt wat hij daarin anders of
+nieuw zou schrijven (bij `.env` alleen de naam, want er staan geheimen in). De overige bestanden
+schrijft hij elke keer opnieuw. De uitvoer noemt elk bestand, de id van de datasleutel en de volgende stappen, zoals
 `kubectl apply -f connector/secrets.yaml`,
 `helm install connector oci://ghcr.io/buildinglinks/charts/connector --version <versie van bl> -f connector/values.yaml`,
 de eerste login en `bl connector join`.
 
-Daarna controleert `bl connector check https://connector.example.nl` de installatie: DNS en TLS
+Daarna, en ook na `bl connector install`, controleert `bl connector check https://connector.example.nl` de installatie: DNS en TLS
 van beide hosts, de DID-documenten (de DID moet bij de host horen), DSP, de publieke data plane,
-dat `/api/v1` en `/gateway` niet publiek zijn, de Trust Authority (met `--authority-did`) en
+dat `/gateway` niet publiek is, dat `/api/v1` een login vraagt (antwoordt de API zonder login, dan
+is dat een fout), de Trust Authority (met `--authority-did`) en
 `/healthz`. Met `--dataspace` en `--environment` controleert hij ook dat de Trust Authority
 lidmaatschap geeft van de dataspace die de connector eist: de naam, en buiten `production` met
-de omgeving erachter (`buildinglinks-pilot-acceptance`). Ben je ingelogd met `bl login`, dan ook de effectieve configuratie, het lidmaatschap
+de omgeving erachter (`voorbeeld-acceptance`). Ben je ingelogd met `bl login`, dan ook de effectieve configuratie, het lidmaatschap
 en de koppeling met je identity provider. Elke controle die niet in orde is, noemt de volgende
 stap (een commando waar dat kan), en het rapport eindigt met de eerste. Draai je de controle van
-buiten je netwerk, geef dan `--extern`: een bereikbare `/api/v1` of `/gateway` is dan een fout in
-plaats van een waarschuwing.
+buiten je netwerk, geef dan `--extern`: een bereikbare `/gateway` is dan een fout in plaats van
+een waarschuwing.
 
 Lid worden doe je met `bl connector join`, na `bl login`:
 
