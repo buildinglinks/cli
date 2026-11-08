@@ -273,7 +273,8 @@ als je dat erbij zet.
 
 Met `bl connector install` installeer je een connector in één keer, in Kubernetes (met de
 Helm-chart `connector`) of met Docker Compose. Het stelt geen vragen, zodat ook een AI-agent het
-kan draaien:
+kan draaien. `bl connector --help` beschrijft het hele verloop, van wat je vooraf nodig hebt tot het
+lidmaatschap, en wat een mens daarin doet:
 
 ```bash
 bl connector install --target k8s --context mijn-cluster \
@@ -292,6 +293,7 @@ De opties zijn die van `bl connector init` (hieronder), met `--out` standaard `c
 | `--context` | het cluster, de NAME uit `kubectl config get-contexts`. Verplicht bij `k8s`: `bl` gebruikt nooit stil de actieve context, en elke aanroep van `kubectl` en `helm` noemt hem. Niet bij `compose` |
 | `--dry-run` | toont wat er zou gebeuren en verandert niets, ook geen bestanden; leest wel uit het cluster |
 | `--timeout` | hoe lang, in seconden, op de uitrol wordt gewacht (standaard 600) |
+| `--own-proxy` | alleen bij `compose`: er draait al een reverse proxy op poort 80 en 443 van de server. Zonder Caddy en zonder controle van de poorten |
 
 **Op Kubernetes** zoekt het de ingress-class (de standaard of de enige) en de ClusterIssuer (de
 enige) op in je cluster; bij meer dan één stopt het met exitcode 2 en de lijst, en kies je met
@@ -305,6 +307,13 @@ het de namespace als die er nog niet is, doet `kubectl apply` van `secrets.yaml`
 tenzij de Caddy van deze installatie ze al heeft (exitcode 5 als ze bezet zijn), en doet
 `docker compose up -d` met de profielen `tls`, `gebouwservice` (niet met `--no-building`) en
 `database` (met `--bundled-db`). Daarna wacht het tot de diensten gezond zijn.
+
+Met `--own-proxy` laat het Caddy (het profiel `tls`) weg en noemt het aan het eind de regels voor
+je eigen proxy, ook in de JSON onder `compose.proxy`: de host van de control plane geheel naar
+`127.0.0.1:8080`, en van de data plane alleen `/public`, `/public/*`, `/token` en `/signaling/*`
+naar `127.0.0.1:8090`, de rest 404. Anders staat de gateway van je eigen apps op internet. De proxy
+geeft de Host-header ongewijzigd door. Tot de proxy staat, mislukken de controles van buiten; dat
+is dan geen fout van `install`, en `bl connector check` is de toets.
 
 Het eindigt met de stand van `bl connector check`, de twee DNS-records met hun doel (het externe
 adres van de ingress-controller, of het adres van de server als dat betrouwbaar publiek is),
@@ -341,7 +350,9 @@ bl connector init --target k8s \
 | `--database-url`, of `--bundled-db` | een eigen Postgres, of die van de chart of compose (voor staging en tests) |
 | `--out` | de map voor sleutels en configuratie |
 | `--namespace`, `--release`, `--ingress-class`, `--cluster-issuer` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`), `ingress.className` en de ClusterIssuer van cert-manager (`ingress.certManager.clusterIssuer`) |
-| `--force` | schrijf alles opnieuw: nieuwe sleutels, en `values.yaml` en `.env` overschreven; een draaiende connector verliest dan zijn DID |
+| `--force` | schrijf alles opnieuw: nieuwe sleutels, en `values.yaml` en `.env` overschreven; een draaiende connector verliest dan zijn DID. Alleen in een terminal: vanuit een script of agent weigert `bl` het (exitcode 2) |
+
+`--database-url` en `--oidc-client-secret` zijn geheim. Geef ze als bestand (`@pad`), op stdin (`-`) of in de omgeving (`BL_DATABASE_URL`, `BL_OIDC_CLIENT_SECRET`); een waarde op de commandoregel werkt, maar komt in je shellgeschiedenis en in de proceslijst, en `bl` waarschuwt daarvoor.
 
 In `--out` komen:
 
