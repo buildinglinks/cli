@@ -180,6 +180,7 @@ Een paar stappen:
 | `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
 | `bl connector install --target k8s\|compose …` | een eigen connector in één keer installeren: sleutels en configuratie, de uitrol en de controles, zie [Een eigen connector](#een-eigen-connector) |
 | `bl connector init --target k8s\|compose …` | alleen de sleutels, geheimen en configuratie voor een eigen connector |
+| `bl connector upgrade` | een connector bijwerken naar de versie van `bl`, met de configuratie die hij heeft, zie [Bijwerken](#bijwerken) |
 | `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen; elke mislukte controle noemt de volgende stap |
 | `bl connector join <url> --org … --kvk … --role … --contact … --signatory …` | je organisatie aanmelden bij de Trust Authority en wachten tot het lidmaatschap actief is |
 | `bl api <METHODE> <pad> [--data …]` | één aanroep van de beheer-API, met de sessie van `bl login` |
@@ -326,6 +327,20 @@ exitcode 8, net als een andere mislukte controle terwijl de namen al goed wijzen
 Opnieuw draaien is veilig: bestaande sleutels, `values.yaml` en `.env` blijven staan, en
 `values.yaml` bepaalt dan ook de ingress-class en de ClusterIssuer. Geheimen komen nooit in de
 uitvoer, ook niet als `kubectl`, `helm` of `docker` ze in een foutmelding herhalen.
+
+### Bijwerken
+
+Installeer de nieuwe `bl` en draai `bl connector upgrade` waar je `install` draaide (op Kubernetes
+met `--context`), eerst met `--dry-run`. Vlaggen voor de configuratie zijn er niet: het leest alles
+uit de map van de installatie (`--out`, standaard `connector`). Het vergelijkt de versie op
+`/healthz` (of, als de connector niet antwoordt, uit `helm list` of `.env`) met die van `bl`, en
+weigert als de connector nieuwer is: werk dan eerst `bl` bij. Het toont per versie onderweg de
+eerste zin van de [upgrade-notities](https://docs.buildinglinks.nl/beheren/upgraden/#per-versie), en
+stopt voor een back-up van de database en als er iets breekt. In een terminal bevestig je met een
+vraag, daarbuiten met `--back-up-gemaakt` en `--wijzigingen-gelezen`; zonder stopt het met
+exitcode 2 en een hint. Met de database van de installatie zelf (`--bundled-db`) maakt het een dump
+in `back-ups/`. `bl connector install` op een bestaande connector doet hetzelfde. Een nieuwere `bl`
+dan de jouwe noemen `upgrade` en `bl connector check`.
 
 Wil je alleen de bestanden, gebruik dan `bl connector init`:
 
