@@ -377,7 +377,7 @@ nieuw zou schrijven (bij `.env` alleen de naam, want er staan geheimen in). De o
 schrijft hij elke keer opnieuw. De uitvoer noemt elk bestand, de id van de datasleutel en de volgende stappen, zoals
 `kubectl apply -f connector/secrets.yaml`,
 `helm install connector oci://ghcr.io/buildinglinks/charts/connector --version <versie van bl> -f connector/values.yaml`,
-de eerste login en `bl connector join`.
+de eerste login, `bl login` en `bl connector join`.
 
 Daarna, en ook na `bl connector install`, controleert `bl connector check https://connector.example.nl` de installatie: DNS en TLS
 van beide hosts, de DID-documenten (de DID moet bij de host horen), DSP, de publieke data plane,
@@ -391,7 +391,8 @@ stap (een commando waar dat kan), en het rapport eindigt met de eerste. Draai je
 buiten je netwerk, geef dan `--extern`: een bereikbare `/gateway` is dan een fout in plaats van
 een waarschuwing.
 
-Lid worden doe je met `bl connector join`, na `bl login`:
+Lid worden doe je met `bl connector join`, na `bl login` (of met de wizard onder *Aanmelden* in de
+beheeromgeving):
 
 ```bash
 bl connector join https://connector.example.nl \
