@@ -272,9 +272,10 @@ als je dat erbij zet.
 ## Een eigen connector
 
 Met `bl connector install` installeer je een connector in één keer, in Kubernetes (met de
-Helm-chart `connector`) of met Docker Compose. Het stelt geen vragen, zodat ook een AI-agent het
-kan draaien. `bl connector --help` beschrijft het hele verloop, van wat je vooraf nodig hebt tot het
-lidmaatschap, en wat een mens daarin doet:
+Helm-chart `connector`) of met Docker Compose. Het stelt geen vragen tussendoor en noemt aan het
+eind de volgende stap. `bl connector --help` beschrijft het hele verloop, van wat je vooraf nodig
+hebt tot het lidmaatschap, en wat je buiten `bl` doet. Daarmee kan een AI-agent je begeleiden,
+zonder zelf toegang tot je systemen. Bijvoorbeeld:
 
 ```bash
 bl connector install --target k8s --context mijn-cluster \
@@ -346,7 +347,7 @@ bl connector init --target k8s \
 | `--control-plane-host`, `--data-plane-host` | de twee publieke hosts; de DID volgt uit de eerste. Ook een volledig adres mag; `http://` alleen in `development` |
 | `--authority-did` | de DID van de Trust Authority, als je `--authority` niet geeft; haar adres volgt eruit |
 | `--dataspace` | `BL_DATASPACE`, de dataspace zoals de Trust Authority hem noemt; met `--authority` komt hij daarvandaan, anders standaard `buildinglinks` |
-| `--oidc-issuer` | de issuer-URL van je identity provider: `BL_OIDC_ISSUER` in de configuratie, en `keycloak-client.json` om in Keycloak te importeren. Dan heeft niemand de setup-code nodig. Met `--oidc-client-id` (standaard `connector`), `--oidc-client-secret` (standaard maakt `bl` er een) en `--oidc-internal-url`. Microsoft Entra ID (`https://login.microsoftonline.com/<tenant>/v2.0`) herkent `bl` aan de host: `--oidc-client-id` en `--oidc-client-secret` zijn dan verplicht, er komt geen `keycloak-client.json`, en de configuratie krijgt de rollen-claim `roles` en `offline_access` |
+| `--oidc-issuer` | de issuer-URL van je identity provider: `BL_OIDC_ISSUER` in de configuratie, en `keycloak-client.json` om in Keycloak te importeren. Dan heeft niemand de setup-code nodig. Met `--oidc-client-id` (standaard `buildinglinks-connector`; de rollen zijn client-rollen van die client, in de claim `buildinglinks_roles`), `--oidc-client-secret` (standaard maakt `bl` er een) en `--oidc-internal-url`. Microsoft Entra ID (`https://login.microsoftonline.com/<tenant>/v2.0`) herkent `bl` aan de host: `--oidc-client-id` en `--oidc-client-secret` zijn dan verplicht, er komt geen `keycloak-client.json`, en de configuratie krijgt de rollen-claim `roles` en `offline_access` |
 | `--database-url`, of `--bundled-db` | een eigen Postgres, of die van de chart of compose (voor staging en tests) |
 | `--out` | de map voor sleutels en configuratie |
 | `--namespace`, `--release`, `--ingress-class`, `--cluster-issuer` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`), `ingress.className` en de ClusterIssuer van cert-manager (`ingress.certManager.clusterIssuer`) |
