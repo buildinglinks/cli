@@ -29,7 +29,8 @@ amd64. Probeer dan https://demo.buildinglinks.nl. Op Windows is `bl` nog niet ge
 macOS en Linux:
 
 ```bash
-curl -fsSL https://github.com/buildinglinks/cli/releases/latest/download/bl-installer.sh | sh
+curl -fsSLO https://github.com/buildinglinks/cli/releases/latest/download/bl-installer.sh
+sh bl-installer.sh
 ```
 
 Windows (PowerShell):
@@ -175,12 +176,12 @@ Een paar stappen:
 | `bl sim logs [-f] [service …]` | logs, bijvoorbeeld `bl sim logs -f sensortrust-cp` |
 | `bl sim requests [--from] [--to] [--level]` | de datarequests uit de logopslag, bijvoorbeeld `--from 2h --level warn` |
 | `bl logs runtime --direct` | de eigen logs van de diensten uit de logopslag, als een connector niet draait |
-| `bl login <url>` / `bl whoami` / `bl logout` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
+| `bl login <url>` / `bl whoami` / `bl logout <url>` | inloggen bij een connector via zijn UI en je IdP; de sleutel blijft op je machine |
 | `bl evidence verify <pakket.json> --authority <did:webvh>` | een bewijspakket offline controleren |
 | `bl connector install --target k8s\|compose …` | een eigen connector in één keer installeren: sleutels en configuratie, de uitrol en de controles, zie [Een eigen connector](#een-eigen-connector) |
 | `bl connector init --target k8s\|compose …` | alleen de sleutels, geheimen en configuratie voor een eigen connector |
 | `bl connector check <url>` | een draaiende connector controleren, van buitenaf en (na `bl login`) van binnen; elke mislukte controle noemt de volgende stap |
-| `bl connector join <url> --org … --kvk … --role … --contact …` | je organisatie aanmelden bij de Trust Authority en wachten tot het lidmaatschap actief is |
+| `bl connector join <url> --org … --kvk … --role … --contact … --signatory …` | je organisatie aanmelden bij de Trust Authority en wachten tot het lidmaatschap actief is |
 | `bl api <METHODE> <pad> [--data …]` | één aanroep van de beheer-API, met de sessie van `bl login` |
 
 Opties van `bl sim start`:
@@ -400,17 +401,24 @@ bl connector join https://connector.example.nl \
   --org "Voorbeeld B.V." --kvk 12345678 \
   --role bms_provider \
   --contact "Naam <naam@example.nl>" \
+  --signatory "Naam <directie@example.nl>" \
   --accept-rulebook
 ```
 
-Het stuurt de aanmelding naar de Trust Authority (zoals de wizard onder *Aanmelden*) en wacht
-tot haar beheerder heeft goedgekeurd en het lidmaatschapsbewijs binnen is (standaard tien
-minuten, `--wait`). `--contact` is de contactpersoon en de tekenbevoegde, als `"Naam <e-mail>"`
-(een andere tekenbevoegde: `--signatory "Naam <e-mail>"`). Meestal mailt de Trust Authority de
-tekenbevoegde, die de documenten achter de link bevestigt of ondertekent. Laat zij toe zonder mail
-(de stand `admin`), dan is `--accept-rulebook` de aanvaarding van het rulebook door de tekenbevoegde. `--role`
+Het stuurt de aanmelding naar de Trust Authority (zoals de wizard onder *Aanmelden*) en zegt wat
+er nu gebeurt: de mail aan de tekenbevoegde, dan de goedkeuring door de beheerder van de Trust
+Authority. Dat kan uren duren, dus het wacht niet; met `--wait <seconden>` wacht het tot het
+lidmaatschapsbewijs binnen is. `--contact` is de contactpersoon en `--signatory` de tekenbevoegde
+volgens de KvK, elk als `"Naam <e-mail>"`; de tekenbevoegde is vaak iemand anders, zoals de
+directeur. Meestal mailt de Trust Authority de tekenbevoegde, die de documenten achter de link
+bevestigt of ondertekent. Laat zij toe zonder mail (de stand `admin`), dan is `--accept-rulebook`
+de aanvaarding van het rulebook door de tekenbevoegde, en mag het e-mailadres van de tekenbevoegde
+weg. `--role`
 mag vaker; de rollen staan op `/api/v1/onboarding/roles` van de Trust Authority. Nog eens
-aanroepen, ook zonder gegevens, wacht verder; is de connector al lid, dan zegt het dat.
+aanroepen, ook zonder gegevens, toont de stand en dient niets opnieuw in; is de connector al lid,
+dan zegt het dat. Zonder terminal komt met `--wait` elke nieuwe stand als een regel JSON op stderr
+(`{"state": "awaiting_signature", "message": …}`), en het resultaat op stdout; na `active` is
+`next` `bl connector check <url>`.
 
 ## Scripts en AI-agents
 
@@ -430,14 +438,15 @@ Bij een echte connector log je eerst in met `bl login <url>`; daarna doet `bl ap
 aanroep van de beheer-API met die sessie:
 
 ```bash
-bl connector join https://connector.example.nl --org "Voorbeeld B.V." --kvk 12345678 --role bms_provider --contact "Naam <naam@example.nl>" --accept-rulebook
+bl connector join https://connector.example.nl --org "Voorbeeld B.V." --kvk 12345678 --role bms_provider --contact "Naam <naam@example.nl>" --signatory "Naam <directie@example.nl>" --accept-rulebook
 bl api GET /api/v1/self
 bl api POST /api/v1/sources --data @systeem.json
 bl api PUT /api/v1/settings/idp --data - < idp.json
 ```
 
-`bl connector` en `bl api` volgen de afspraken voor agents: buiten een terminal is de uitvoer
-JSON, en een fout staat als JSON op stderr (`code`, `message`, `hint`). De exitcodes:
+`bl connector`, `bl api` en `bl logs requests` volgen de afspraken voor agents: buiten een
+terminal is de uitvoer JSON, en een fout staat als JSON op stderr (`code`, `message`, `hint`). De
+exitcodes:
 
 | Exitcode | Betekenis |
 |---|---|
