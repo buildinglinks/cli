@@ -293,7 +293,7 @@ De opties zijn die van `bl connector init` (hieronder), met `--out` standaard `c
 
 | Optie | Betekenis |
 |---|---|
-| `--context` | het cluster, de NAME uit `kubectl config get-contexts`. Verplicht bij `k8s`: `bl` gebruikt nooit stil de actieve context, en elke aanroep van `kubectl` en `helm` noemt hem. Niet bij `compose` |
+| `--context` | het cluster, de NAME uit `kubectl config get-contexts`. Verplicht bij `k8s`: `bl` gebruikt nooit stil de actieve context, en elke aanroep van `kubectl` en `helm` noemt hem. Helm 3 (vanaf 3.8) en Helm 4 werken allebei. Niet bij `compose` |
 | `--dry-run` | toont wat er zou gebeuren en verandert niets, ook geen bestanden; leest wel uit het cluster |
 | `--timeout` | hoe lang, in seconden, op de uitrol wordt gewacht (standaard 600) |
 | `--own-proxy` | alleen bij `compose`: er draait al een reverse proxy op poort 80 en 443 van de server. Zonder Caddy en zonder controle van de poorten |
@@ -340,7 +340,8 @@ stopt voor een back-up van de database en als er iets breekt. In een terminal be
 vraag, daarbuiten met `--back-up-gemaakt` en `--wijzigingen-gelezen`; zonder stopt het met
 exitcode 2 en een hint. Met de database van de installatie zelf (`--bundled-db`) maakt het een dump
 in `back-ups/`. `bl connector install` op een bestaande connector doet hetzelfde. Een nieuwere `bl`
-dan de jouwe noemen `upgrade` en `bl connector check`.
+dan de jouwe noemen `upgrade` en `bl connector check`. Na een upgrade noemt `bl` alleen de bestanden
+die veranderen, en als volgende stappen alleen wat de upgrade vraagt.
 
 Wil je alleen de bestanden, gebruik dan `bl connector init`:
 
