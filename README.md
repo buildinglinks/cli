@@ -330,18 +330,24 @@ uitvoer, ook niet als `kubectl`, `helm` of `docker` ze in een foutmelding herhal
 
 ### Bijwerken
 
-Installeer de nieuwe `bl` en draai `bl connector upgrade` waar je `install` draaide (op Kubernetes
-met `--context`), eerst met `--dry-run`. Vlaggen voor de configuratie zijn er niet: het leest alles
-uit de map van de installatie (`--out`, standaard `connector`). Het vergelijkt de versie op
-`/healthz` (of, als de connector niet antwoordt, uit `helm list` of `.env`) met die van `bl`, en
-weigert als de connector nieuwer is: werk dan eerst `bl` bij. Het toont per versie onderweg de
-eerste zin van de [upgrade-notities](https://docs.buildinglinks.nl/beheren/upgraden/#per-versie), en
-stopt voor een back-up van de database en als er iets breekt. In een terminal bevestig je met een
-vraag, daarbuiten met `--back-up-gemaakt` en `--wijzigingen-gelezen`; zonder stopt het met
-exitcode 2 en een hint. Met de database van de installatie zelf (`--bundled-db`) maakt het een dump
-in `back-ups/`. `bl connector install` op een bestaande connector doet hetzelfde. Een nieuwere `bl`
-dan de jouwe noemen `upgrade` en `bl connector check`. Na een upgrade noemt `bl` alleen de bestanden
-die veranderen, en als volgende stappen alleen wat de upgrade vraagt.
+Installeer de nieuwe `bl` en draai `bl connector upgrade`, eerst met `--dry-run`. Vlaggen voor de
+configuratie zijn er niet. Op Kubernetes (`--context`) is het cluster de bron: `bl` neemt de values van
+de Helm-release en laat de Secrets staan, dus het werkt vanaf elke machine die met haar kube-context
+bij de namespace kan, ook zonder de map van de installatie. Is die map er wel, dan noemt `bl` wat haar
+`values.yaml` anders zou maken; uitrollen doe je met `--values connector/values.yaml`. Met Docker
+Compose draai je het op de server, en leest het `.env` in de map van de installatie (`--out`,
+standaard `connector`).
+
+Het vergelijkt de versie op `/healthz` (of, als de connector niet antwoordt, uit `helm list` of
+`.env`) met die van `bl`, en weigert als de connector nieuwer is: werk dan eerst `bl` bij. Het toont
+per versie onderweg de eerste zin van de
+[upgrade-notities](https://docs.buildinglinks.nl/beheren/upgraden/#per-versie), en stopt voor een
+back-up van de database en als er iets breekt. In een terminal bevestig je met een vraag, daarbuiten
+met `--back-up-gemaakt` en `--wijzigingen-gelezen`; zonder stopt het met exitcode 2 en een hint. Met
+de database van de installatie zelf (`--bundled-db`) maakt het een dump in `back-ups/`, in de map
+van de installatie of anders waar je `bl` draait. Een nieuwere `bl` dan de jouwe noemen `upgrade` en
+`bl connector check`. Na een upgrade noemt `bl` alleen wat verandert, en als volgende stappen alleen
+wat de upgrade vraagt.
 
 Wil je alleen de bestanden, gebruik dan `bl connector init`:
 
