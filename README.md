@@ -374,21 +374,27 @@ bl connector init --target k8s \
 | `--database-url`, of `--bundled-db` | een eigen Postgres, of die van de chart of compose (voor staging en tests) |
 | `--out` | de map voor sleutels en configuratie |
 | `--namespace`, `--release`, `--ingress-class`, `--cluster-issuer` | alleen bij `k8s`: namespace, naam van de Helm-release (standaard `connector`), `ingress.className` en de ClusterIssuer van cert-manager (`ingress.certManager.clusterIssuer`) |
+| `--offline-key-hash` | de hash (`bl key hash`) van de herstelsleutel van de DID, die je zelf maakte met `bl key generate --ed25519`; zonder maakt `init` hem en toont hem één keer |
+| `--backup-bucket` | alleen bij `k8s`: zet de back-up van de chart aan, elk kwartier een met age versleutelde dump van de database naar deze bucket. Met `--backup-endpoint` (de object storage), `--backup-recipient` (een publieke age-sleutel, herhaalbaar), `--backup-access-key-id` en `--backup-secret-access-key` (de sleutel van de bucket; bij een volgende run die van de vorige), en eventueel `--backup-region` (docs: beheren/back-up) |
 | `--force` | schrijf alles opnieuw: nieuwe sleutels, en `values.yaml` en `.env` overschreven; een draaiende connector verliest dan zijn DID. Alleen in een terminal: vanuit een script of agent weigert `bl` het (exitcode 2) |
 
-`--database-url` en `--oidc-client-secret` zijn geheim. Geef ze als bestand (`@pad`), op stdin (`-`) of in de omgeving (`BL_DATABASE_URL`, `BL_OIDC_CLIENT_SECRET`); een waarde op de commandoregel werkt, maar komt in je shellgeschiedenis en in de proceslijst, en `bl` waarschuwt daarvoor.
+`--database-url`, `--oidc-client-secret` en `--backup-secret-access-key` zijn geheim. Geef ze als bestand (`@pad`), op stdin (`-`) of in de omgeving (`BL_DATABASE_URL`, `BL_OIDC_CLIENT_SECRET`, `BL_BACKUP_SECRET_ACCESS_KEY`); een waarde op de commandoregel werkt, maar komt in je shellgeschiedenis en in de proceslijst, en `bl` waarschuwt daarvoor.
+
+De herstelsleutel van de DID schrijft `init` nergens heen: het toont hem één keer, aan het eind (in
+de JSON als `offline.key`), en schrijft alleen zijn hash in `did-recovery-key.hash`. **Bewaar hem op
+papier, op twee plekken, niet op de server.** Gewone wijzigingen van het DID-document tekent de
+connector zelf; de herstelsleutel heb je nodig na een inbraak en voor een verhuizing. Zie
+[de herstelsleutel](https://docs.buildinglinks.nl/inpassen/installeren/#de-herstelsleutel).
 
 In `--out` komen:
 
-- `geheimen/connector/`: `identity.jwk`, `dataplane.pub.jwk`, `did-update.jwk`,
-  `did-update-next.jwk`, `data.key`, `session.key` en `did-next-key.hash`, de sleutelmap van de
-  control plane;
+- `geheimen/connector/`: `identity.jwk`, `dataplane.pub.jwk`, `data.key`, `session.key` en
+  `did-recovery-key.hash`, de sleutelmap van de control plane;
 - `geheimen/dataplane/`: `dataplane.jwk` en dezelfde `data.key`;
 - `geheimen/database/`: het wachtwoord van Postgres, met `--bundled-db`;
-- `offline/did-update-after.jwk`: de update-sleutel na de volgende. **Bewaar hem offline, niet
-  op de server**; alleen zijn hash staat in `did-next-key.hash`;
-- bij `k8s`: `secrets.yaml` (de Secrets `connector-keys`, `dataplane-keys` en `connector-env`)
-  en `values.yaml` met de minimale configuratie;
+- `geheimen/backup/`: de sleutel van de bucket, met `--backup-bucket`;
+- bij `k8s`: `secrets.yaml` (de Secrets `connector-keys`, `dataplane-keys` en `connector-env`,
+  en met `--backup-bucket` `connector-backup`) en `values.yaml` met de minimale configuratie;
 - bij `compose`: `compose.yaml`, `Caddyfile` en `.env`. In `.env` staan ook `BL_UID` en
   `BL_GID`, de eigenaar van `geheimen/`: connector en data plane draaien als die gebruiker en
   lezen de sleutels zonder `chown`;
